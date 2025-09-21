@@ -1,0 +1,12 @@
+{
+  "showLineNumber": true,
+  "livePreview": false,
+  "propertiesInDocument": "hidden",
+  "spellcheck": false,
+  "autoPairBrackets": false,
+  "smartIndentList": false,
+  "useTab": false,
+  "autoPairMarkdown": false,
+  "autoConvertHtml": false,
+  "vimMode": false
+}
