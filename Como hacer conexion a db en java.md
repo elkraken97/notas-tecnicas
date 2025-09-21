@@ -54,4 +54,74 @@ Este ejemplo sirve para hacer leer todos los datos de una tabla
 pero lo importante es Statement y el resto
 Statement es una interfaz hecha para hacer conexiones a una db en este caso 
 la conexion ya previamente hecah crea un Statement para la Interface Statement
+
 Despues Statement executa la Query que nosotros especifiquemos y regresa los resultados en un ResultSet que es mas o menos el equivalente de una tabla en la memoria actual 
+ResultSet puede leer los datos de la tabla con rs.next() (el que se usa en el codigo) pero tambien los previos con  rs.previous(); esto lee cada columna
+
+Siguiendo el codigo ahora se lee la metadata de el ResultSet con .getMetaData() y se guarda en un ResultSetMetdaData
+Esto no son los datos de la tabla si no los metadatos como nombres de las columnas si se premiten NULL si son autoincrementables etc esto nos sirve para saber cuantas columnas tenemos por ejemplo
+
+Ahora analisemos el bucle
+```
+    int columnas = metaData.getColumnCount();  
+  while (rs.next()) {  
+  
+	for (int i = 1; i <= columnas; i++) {  
+            String nombreC = metaData.getColumnName(i);  
+            Object c = rs.getObject(i);  
+            System.out.println(nombreC +":"+c);  
+  }   
+         }
+         }
+```
+Ahora el bucle while en cada iteracion hace un rs.next y se dentendra hasta iterar todas las filas de la tabla de ahi el bucle for itera las veces de columnas que anterior mente obtuvimos con la metadata
+
+Con la misma metadata obtenemos el nombre de la columna en la posicion i (la primera columna) que en este caso es 1 (es practicamente un arreglo pero este no inicia en 0 si no siempre inicia en 1)
+Ahora inicia un Object para recibir cualquier cosa que regrese la tabla ya sea un Integer un String etc podriamos utilizar .getString(i) pero solo estando seguros de el tipo de dato que devolvera la tabla de lo contrario devolvera un error
+
+Asi que el caso mas seguro Object para contemplar cualquier tipo de objeto
+
+
+Ahora veamos como pasar una query con variables para un Where o un Insert para la base de datos y limpiarlos de una posible inyeccion sql
+
+Veamos este codigo
+```
+    private static void insertarDatos(Usuariodb usr, Connection conn) throws SQLException {
+        String sql = "INSERT INTO datos (nombre,edad,tts) VALUES (?,?,?) ";
+        PreparedStatement est = conn.prepareCall(sql);
+        est.setString(1,usr.getNombre());
+        est.setInt(2,usr.getEdad());
+        est.setBoolean(3,usr.isTts());
+        est.executeUpdate();
+    }
+```
+
+En este caso de codigo primero preparamos la query que vamos a ejecutar en este caso un insert a nombre edad y un parametro boolean tts (es por probar booleanos en db) ahora como de esta ejecucion no obtendremos ninguna respuesta solo tenemos que ejecutarlo
+En lugar de usar Statement y concatenar las variables en la String que ejecutaremos usaremos PreparedStatement dentro de la query o el sql a ejecutar ponder (?) donde iran los datos que insertara PraparedStatement esto se hace para evitar inyecciones sql dentro de la base de datos y se consdiera una buena practica para esto
+
+Ahora para insertar los datos necesarios dentro de la llamada primero usamos conn.prepareCall()
+    (recordemos que conn es la conexion previamente hecha en el inicio)
+ y la guardamos en PreparedStatement en la variante que llamaremos est
+
+ ahora llamaremos a est.set();
+ y el tipo de dato que queramos insertar para la columna de la tabla
+ en este caso est.setString(); inserta un string
+
+Cualquier est.set() independientemente del dato tiene dos parametros el primero es un int que especifica en que lugar de los (?) que marcamos en la query  va a ocupar y el segundo parametro es el dato que guardaremos
+
+Por ejemplo tenemos en el codigo 
+
+```
+        est.setString(1,usr.getNombre());
+        est.setInt(2,usr.getEdad());
+        est.setBoolean(3,usr.isTts());
+```
+ 
+y por ultimo le decimos a prepared Statement que ejecute la query
+con 
+```
+         est.executeUpdate();
+```
+Si la query que se ejecuto tiene un error o durante la actualizacion en db ocurre algo esto lansara una excepcion lo mismo con el caso anterior que devuelve todo de la tabla
+
+En caso de que no ocurra un excepcion en esta parte del codigo es que todo a ido bien 
