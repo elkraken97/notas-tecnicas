@@ -155,8 +155,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -168,7 +167,7 @@
       "command-palette:Abrir paleta de comandos": false
     }
   },
-  "active": "e70c3300affa4bc7",
+  "active": "41f54642251c9e7c",
   "lastOpenFiles": [
     "AnotacionesDeProyectoRedSocial/Capas y SOlid.md",
     "Como hacer conexion a db en java.md",
