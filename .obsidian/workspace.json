@@ -14,7 +14,7 @@
               "type": "markdown",
               "state": {
                 "file": "Como hacer conexion a db en java.md",
-                "mode": "source",
+                "mode": "preview",
                 "source": true
               },
               "icon": "lucide-file",
@@ -159,6 +159,7 @@
   },
   "left-ribbon": {
     "hiddenItems": {
+      "bases:Crear nueva base": false,
       "switcher:Abrir selector rápido": false,
       "graph:Abrir vista gráfica": false,
       "canvas:Crear nuevo lienzo": false,
@@ -167,7 +168,7 @@
       "command-palette:Abrir paleta de comandos": false
     }
   },
-  "active": "41f54642251c9e7c",
+  "active": "ab33f7e5900ca4da",
   "lastOpenFiles": [
     "AnotacionesDeProyectoRedSocial/Capas y SOlid.md",
     "Como hacer conexion a db en java.md",

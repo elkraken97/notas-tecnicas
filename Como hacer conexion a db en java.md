@@ -125,3 +125,92 @@ con
 Si la query que se ejecuto tiene un error o durante la actualizacion en db ocurre algo esto lansara una excepcion lo mismo con el caso anterior que devuelve todo de la tabla
 
 En caso de que no ocurra un excepcion en esta parte del codigo es que todo a ido bien 
+
+Para ver especificamente los errores es necesario manejar los errors por try catch separados para cada caso 
+
+# Conexion DB Hikari
+
+Hikari es un pool de bases de datos osea que gestiona las conexiones a las bases de datos de forma eficiente en lugar de cerrar y abrir conexiones constantemente
+
+Como lo estabamos haciendo resulta costoso y lento abrir y cerrar con cada consulta asi que solo es ideal para pruebas para un entorno de mas concurrencia y recomendado se usa HikariCP 
+
+la dependencia para esto es
+
+```
+     <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>5.1.0</version>
+        </dependency>
+```
+
+
+y la implementacion es de esta forma:
+
+```
+package org.example.ProvedoresDeDatos;
+
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
+import javax.sql.DataSource;
+
+public class ProvedorDeDatosHIkari {
+
+    private static volatile HikariDataSource ds;
+
+    ProvedorDeDatosHIkari() {}
+
+    public static DataSource get() {
+        if (ds == null) {
+            synchronized (ProvedorDeDatosHIkari.class) {
+                if (ds == null) {
+                    HikariConfig cfg = new HikariConfig();
+
+
+                    cfg.setJdbcUrl(env("PG_URL", "jdbc:postgresql://localhost:5432/Aplicacion46"));
+                    cfg.setUsername(env("PG_USER", "postgres"));
+                    cfg.setPassword(env("PG_PASSWORD", "pwd"));
+
+                    cfg.setMaximumPoolSize(intEnv("PG_POOL_SIZE", 10));
+                    cfg.setMinimumIdle(intEnv("PG_MIN_IDLE", 2));
+                    cfg.setConnectionTimeout(longEnv("PG_CONN_TIMEOUT_MS", 10_000));
+                    cfg.setIdleTimeout(longEnv("PG_IDLE_TIMEOUT_MS", 60_000));
+                    cfg.setMaxLifetime(longEnv("PG_MAX_LIFETIME_MS", 30 * 60_000));
+                    cfg.setPoolName(env("PG_POOL_NAME", "pg-pool"));
+
+                    ds = new HikariDataSource(cfg);
+
+                    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                        HikariDataSource x = ds;
+                        if (x != null && !x.isClosed()) x.close();
+                    }));
+                }
+            }
+        }
+        return ds;
+    }
+
+    private static String env(String k, String def) {
+        String v = System.getenv(k);
+        return (v == null || v.isEmpty()) ? def : v;
+    }
+
+    private static int intEnv(String k, int def) {
+        try { return Integer.parseInt(env(k, String.valueOf(def))); }
+        catch (Exception e) { return def; }
+    }
+
+    private static long longEnv(String k, long def) {
+        try { return Long.parseLong(env(k, String.valueOf(def))); }
+        catch (Exception e) { return def; }
+    }
+
+
+}
+
+```
+
+
+Analizemos el codigo
+
