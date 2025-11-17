@@ -2,7 +2,8 @@
 (leer en modo fuente)
 primero dependiendo de la db necesitas como un adaptador en el pom.xml (en el caso de maven)
 en el caso que yo uso postgress el adaptador JDBC es algo asi:
-```
+```xml title:pom.xml
+
 <dependency>  
     <groupId>org.postgresql</groupId>  
     <artifactId>postgresql</artifactId>  
@@ -14,7 +15,7 @@ Esto es un dirver para una base de datos tipo postgresql para cada base datos ex
 Ahora teniendo esto se hace una conexion a db 
 puede ser simple en algo como por ejemplo
 Codigo:
-```
+```java
  
 String url = "jdbc:postgresql://localhost:5432/Testeo";  
 String usuario = "postgres";  
@@ -32,7 +33,7 @@ Y el resto de datos deben ser los de nuestra base de datos en este caso independ
 Query o solicitudes a la db
 Veamos un caso de eliminar de obtener a los usuarios
 
-```
+```java
 
 private static void obtenerDatosDeLaTabla(Connection conn) throws SQLException {  
     System.out.println("Conexion exitosa");  
@@ -62,7 +63,7 @@ Siguiendo el codigo ahora se lee la metadata de el ResultSet con .getMetaData() 
 Esto no son los datos de la tabla si no los metadatos como nombres de las columnas si se premiten NULL si son autoincrementables etc esto nos sirve para saber cuantas columnas tenemos por ejemplo
 
 Ahora analisemos el bucle
-```
+```java
     int columnas = metaData.getColumnCount();  
   while (rs.next()) {  
   
@@ -85,7 +86,7 @@ Asi que el caso mas seguro Object para contemplar cualquier tipo de objeto
 Ahora veamos como pasar una query con variables para un Where o un Insert para la base de datos y limpiarlos de una posible inyeccion sql
 
 Veamos este codigo
-```
+```java
     private static void insertarDatos(Usuariodb usr, Connection conn) throws SQLException {
         String sql = "INSERT INTO datos (nombre,edad,tts) VALUES (?,?,?) ";
         PreparedStatement est = conn.prepareCall(sql);
@@ -111,7 +112,7 @@ Cualquier est.set() independientemente del dato tiene dos parametros el primero 
 
 Por ejemplo tenemos en el codigo 
 
-```
+```java
         est.setString(1,usr.getNombre());
         est.setInt(2,usr.getEdad());
         est.setBoolean(3,usr.isTts());
@@ -119,7 +120,7 @@ Por ejemplo tenemos en el codigo
  
 y por ultimo le decimos a prepared Statement que ejecute la query
 con 
-```
+```java
          est.executeUpdate();
 ```
 Si la query que se ejecuto tiene un error o durante la actualizacion en db ocurre algo esto lansara una excepcion lo mismo con el caso anterior que devuelve todo de la tabla
@@ -136,7 +137,7 @@ Como lo estabamos haciendo resulta costoso y lento abrir y cerrar con cada consu
 
 la dependencia para esto es
 
-```
+```java
      <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
@@ -147,7 +148,7 @@ la dependencia para esto es
 
 y la implementacion es de esta forma:
 
-```
+```java
 package org.example.ProvedoresDeDatos;
 
 import com.zaxxer.hikari.HikariConfig;
@@ -212,5 +213,224 @@ public class ProvedorDeDatosHIkari {
 ```
 
 
-Analizemos el codigo
+Analizemos el codigo 
 
+Primero 
+```java
+import javax.sql.DataSource;
+```
+esto es una interface de java que nos proporciona una conexion en lugar de un DriveManager para obtener una conexion tambien se puede utilizar DataSource
+de esta forma
+```java
+DataSource ds = new MysqlDataSource();
+ds.setServerName("localhost");
+ds.setDatabaseName("mi_base");
+ds.setUser("usuario");
+ds.setPassword("clave");
+
+Connection conn = ds.getConnection();
+```
+La diferencia con DriveManager es que es mas flexible y permite un manejo mas eficiente de las conexiones con una implementacion adecuada aunque si es un proyecto pequeño sigo recomendando mas DriveManager y no es algo que se limite a bases de datos 
+
+Ahora 
+
+```java
+  private static volatile HikariDataSource ds;
+```
+
+Primero HikariDataSource es una implementacion de la DataSource (el anteriormente importado) que ya trae la dependencia (o libreria) de hikari esta se implementa a modo de singleton marcandola como privada y statica es decir privada es solo de la clase y static que pertence a la instancia y no a una instancia 
+Y por ultimo volatile esto hace que todos los hilos vean a ds o el objeto de la implementacion HikariDataSource y ademas tengan el valor de la variable actualizado y no un valor del cache de la JVM
+(dejemoslo en que es necesario el volatile)
+```java
+ProvedorDeDatosHIkari() {}
+```
+Despues tenemos un constructor vacio para llamar a la conexion
+Ahora vamos por partes
+```java
+public static DataSource get() {
+```
+Inciamos un metodo estatico llamado get que retorna un DataSource esto siguiendo el patron de diseño sigleton para devolver la misma instancia
+Despues
+```java
+if (ds == null) {
+```
+Verificamos si ds es nulo esto quiere decir que no se a creado ninguna instancia de este objeto (o no se a creado la instancia) por lo que si es nula la creara pero si no lo es quiere decir que ya existe la instancia por lo que la retornara<
+Ahora 
+```java
+synchronized (ProvedorDeDatosHIkari.class) {
+```
+Con esto se sincroniza el acceso a la clase para que dos o mas hilos puedan acceder a la instancia o intentar crearla ya que suponiendo que no hay instancia y no tenemos este sincronizar podriamos generar sin querer dos instancias cuando solo requerimos una o podemos tener bloqueda la instancia por un hilo y terminar creando otra por eso con esta evitamos que varios hilos accedan a la clase o instancia al mismo tiempo
+```java
+if (ds == null) {
+```
+Despues volvemos a verificar si es nullo por si en esa concurrencia se creo la instancia o no teniamos una clase actualizada
+
+```java
+ HikariConfig cfg = new HikariConfig();
+```
+Aqui creamos un nuevo objeto de configuracion que nos ayudara a configurar los datos de la db a la que necesitamos conectarnos 
+```java
+    cfg.setJdbcUrl(env("PG_URL","jdbc:postgresql://localhost:5432/Aplicacion46"));
+            cfg.setUsername(env("PG_USER", "postgres"));
+            cfg.setPassword(env("PG_PASSWORD", "pwd"));
+
+            cfg.setMaximumPoolSize(intEnv("PG_POOL_SIZE", 10));
+            cfg.setMinimumIdle(intEnv("PG_MIN_IDLE", 2));
+            cfg.setConnectionTimeout(longEnv("PG_CONN_TIMEOUT_MS", 10_000));
+            cfg.setIdleTimeout(longEnv("PG_IDLE_TIMEOUT_MS", 60_000));
+            cfg.setMaxLifetime(longEnv("PG_MAX_LIFETIME_MS", 30 * 60_000));
+            cfg.setPoolName(env("PG_POOL_NAME", "pg-pool"));
+```
+Las primeras 3 lineas son para configurar donde esta nuestra base de datos primero la base de datos 
+```java
+"jdbc:postgresql://localhost:puerto/nombre_de_DB"
+```
+
+las demas lineas son configuraciones mas explicitas de la configuracion que van a tener las conexiones o solicitudes que hagamos
+```java
+        cfg.setMaximumPoolSize(intEnv("PG_POOL_SIZE", 10));
+        cfg.setMinimumIdle(intEnv("PG_MIN_IDLE", 2));
+```
+empezemos con MaximumPoolSize esta linea lo que hace es poner un limite a la cantidad de conexiones simultaneas que puede tener la DB si llega a tener mas el servicio esperara hasta que una de las conexiones termine para conectarse
+
+El MinimunIdle es la cantidad minima de hilos que el servicio ya tiene preparado tomando el resto con menos recursos para mejor eficiencia cuando se esten usand pocas conexiones 
+
+
+```java
+            cfg.setConnectionTimeout(longEnv("PG_CONN_TIMEOUT_MS", 10_000));
+            cfg.setIdleTimeout(longEnv("PG_IDLE_TIMEOUT_MS", 60_000));
+            cfg.setMaxLifetime(longEnv("PG_MAX_LIFETIME_MS", 30 * 60_000));
+            cfg.setPoolName(env("PG_POOL_NAME", "pg-pool"));
+```
+ConnectionTimeout Determina cuantos milisegundos puede tomar una solicitud antes de fallar es decir si toma mas de este tiempo se tomara como un error
+
+IdleTimeout determina cuanto tiempo permanece activa una conexion antes de cerrarse 
+
+MaxLifetime determina el tiempo que permanece abierta la conexion antes de cerrarse definitivamente (toda la conexion a la db)
+
+Por ultimo pool name es para que en depuracion salga este nombre y se sepa que hilo salio mal y sepamos que fue parte de la DB
+
+``` java 
+            ds = new HikariDataSource(cfg);
+
+           Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    HikariDataSource x = ds;
+                    if (x != null && !x.isClosed()) x.close();
+                }));
+```
+La primera linea hace que ds (la conexion y la instancia singleton) sea igual a ya la implementacios de Hikari tomando en el constructor la configuracion previamente establecida
+
+
+Por ultimo esto llamado "ShutdownHook" sirve para cerrar correctamente la conexion hecha es decir esto se ejecuta cuando lo ejecutemos y detengamos con ctrl + c la pausa del compilador etc y lo que hace es copiar la instancia que teniamos verficar que exista y si no esta cerrada
+De no ser asi procederemos a cerrarla 
+Esto para cerrar correctamente y evitar concurrencia no deseada
+
+Por ultimo lo usamos de esta forma
+``` java
+ DataSource dataSource = ProvedorDeDatosHIkari.get();
+//(esto tomando como que ProvedorDeDatosHIkari es el nombre de la clase donde esta toda la funcionalidad explicada)
+```
+
+Ahora supongamos una clase que enviara o recibira datos de la DB
+Necesitamos una instancia del proveedor de datos
+entonces:
+```java
+ private final DataSource ds;
+
+    public RepositorioUsuariosSql(DataSource ds) {
+
+        this.ds = ds;
+    }
+    
+```
+Recordemos que Hikari instancia de DataSource asi que usamos a esta para usarla
+
+Ahora supongamos que queremos guardar algo en la db
+
+```java
+
+ @Override
+    public User guardarUsuario(User usr) {
+        String sql = "insert into users(nombre) values (?)";
+        try(Connection cn = ds.getConnection()){
+            PreparedStatement preparedStatement =  cn.prepareStatement(sql);
+        preparedStatement.setString(1, usr.getNombre());
+        preparedStatement.execute();
+        return usr;
+
+
+        }
+        catch (SQLException e){
+            System.out.println("Error al insertar usuario en la conexion a db"+e.getMessage());
+        }
+        return usr;
+    }
+
+```
+
+Recordemos que ds es nuestra instancia al proveedor de datos al usar .getConnection() DataSource ya tiene configurado todo para darnos una conexion y la guardamos en un objeto Connection llamado "cn"
+Usamos PreparedStatement para preparar la llamada con cn.prepareStatement(sql); donde dentro de esta funcion ira la query
+
+luego si nuestra llamada tiene parametros los especificamos con .setString(); o .setInteger(); etc (depende del tipo de dato que vayamos encadenar) esto previniendo inyecciones a sql
+
+Ahora contrario a lo habitual de que la posicion 0 sea la primera aqui la 1 si es la primera asi que ignoremos el uso habitual de indices en arreglos
+Por ultimo a la varibale del PreparedStatement usamos .execute() para lanzar la llamada 
+Si es un update o delete (algo que no haga un retorno directo) y todo hasta ahora no a lanzado algun error por el try significa que la llamada a sido exitosa
+
+Ahora supongamos que buscamos un usuario
+```java
+
+
+ @Override
+    public Optional<User> buscarUsuarioPorNombre(String nombre) {
+        String sql = "select * from users where nombre = (?)  LIMIT 1";
+
+        try(Connection cn = ds.getConnection()){
+            PreparedStatement preparedStatement = cn.prepareStatement(sql);
+            preparedStatement.setString(1, nombre);
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+
+
+                if (resultSet.next()) {
+                    User user = new User(resultSet.getString("nombre"));
+                    user.setId(resultSet.getLong("id"));
+                    return Optional.of(user);
+                }
+
+
+            }
+        }catch (Exception e){
+            System.out.println("Error al buscar usuario en la conexion a db"+e.getMessage());
+        }
+
+
+        return Optional.empty();
+    }
+```
+Nuevamente los pasos 
+Obtenemos la conexion de ds y la tomamos en un objeto Connection
+Preparamos y declaramos los argumentos que llevara la solicitud 
+Ahora atencion a esta linea
+
+```java
+try (ResultSet resultSet = preparedStatement.executeQuery()) {
+```
+Aqui estamos declarando un ResultSet esto obtendra algo al executar la sentencia 
+Este resultSet funciona como un buffer por lo que en este ejemplo en las lineas 
+```java
+                User user = new User(resultSet.getString("nombre"));
+                user.setId(resultSet.getLong("id"));
+```
+Aqui del resultSet estamos obteniendo los valores que necesitamos de acuerdo a la tabla o fila obtenida en este caso el nombre y la id del usuario pero si fueran varios resultados que debemos de leer como select * from 
+Seria asi:
+```java
+    while(resultSet.next()){
+                User user = new User(resultSet.getString("nombre"));
+                user.setId(resultSet.getLong("id"));
+                users.add(user);
+
+            }
+```
+Aqui en cada vuelta del while ejecutara resultSet.next() hasta que se lean todos los resultados obtenidos (tal como un buffer)
+
+            
